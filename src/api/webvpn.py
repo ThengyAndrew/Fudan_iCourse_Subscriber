@@ -166,6 +166,44 @@ class WebVPNSession:
         print("[*] WebVPN login successful!")
         return True
 
+    def _authenticate_icourse_totp(
+        self, url, password_payload, challenge, idp_vpn_base, student_id,
+    ):
+        """Complete the OTP challenge returned after password authentication."""
+        if "userAndOtp" not in (challenge.get("moduleCodes") or []):
+            raise RuntimeError("iCourse CAS did not offer OTP authentication")
+        request_number = challenge.get("requestNumber")
+        chain_code = challenge.get("authChainCode")
+        if not request_number or not chain_code:
+            raise RuntimeError("iCourse CAS OTP challenge is incomplete")
+
+        # Load only when challenged, so normal login doesn't require a secret.
+        from src.api.totp import school_totp
+
+        payload = {
+            "authModuleCode": "userAndOtp",
+            "authChainCode": chain_code,
+            "entityId": password_payload["entityId"],
+            "requestType": password_payload["requestType"],
+            "lck": password_payload["lck"],
+            "requestNumber": request_number,
+            "authPara": {"loginName": student_id, "otpCode": school_totp()},
+        }
+        response = self.session.post(
+            url,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Referer": f"{idp_vpn_base}/ac/",
+                "Origin": config.WEBVPN_BASE,
+            },
+            timeout=60,
+        )
+        result = response.json()
+        if str(result.get("code")) != "200":
+            raise RuntimeError("iCourse CAS OTP authentication failed")
+        return result
+
     def authenticate_icourse(
         self, student_id: str = None, password: str = None
     ) -> bool:
@@ -301,6 +339,11 @@ class WebVPNSession:
         if str(data.get("code")) != "200":
             raise RuntimeError(
                 f"iCourse CAS auth failed (code={data.get('code')})"
+            )
+
+        if data.get("second") and not data.get("loginToken"):
+            data = self._authenticate_icourse_totp(
+                url, payload, data, idp_vpn_base, student_id,
             )
 
         login_token = data.get("loginToken", "")

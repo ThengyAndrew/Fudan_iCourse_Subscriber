@@ -1,5 +1,6 @@
 requests
 pycryptodome
+pyotp
 sherpa-onnx
 numpy
 openai
