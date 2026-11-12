@@ -120,12 +120,6 @@ RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "")
 SMTP_HOST = "smtp.qq.com"
 SMTP_PORT = 465
 
-# Tencent enterprise mailbox for iCourse verification emails
-IMAP_EMAIL = os.environ.get("IMAP_EMAIL", "")
-IMAP_PASSWORD = os.environ.get("IMAP_PASSWORD", "")
-IMAP_HOST = "imap.exmail.qq.com"
-IMAP_PORT = 993
-
 # Database & Storage
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 VIDEO_DIR = os.path.join(DATA_DIR, "videos")

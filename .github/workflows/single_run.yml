@@ -161,8 +161,6 @@ jobs:
         env:
           StuId: ${{ secrets.STUID }}
           UISPsw: ${{ secrets.UISPSW }}
-          IMAP_EMAIL: ${{ secrets.IMAP_EMAIL }}
-          IMAP_PASSWORD: ${{ secrets.IMAP_PASSWORD }}
           COURSE_IDS: ${{ inputs.course_ids }}
           USE_OFFICIAL_TRANSCRIPT: ${{ inputs.use_official_transcript && '1' || '' }}
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
