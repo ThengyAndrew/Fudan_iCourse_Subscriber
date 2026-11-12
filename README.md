@@ -13,7 +13,7 @@
 
 假设你选了「摸鱼学导论」和「躺平学原理」两门课。在每天设定的时间，iCourse Subscriber 会自动：
 
-1. 登录你的复旦 iCourse 账号（通过 WebVPN）
+1. 登录你的复旦 iCourse 账号（通过 WebVPN，支持服务端要求的 TOTP 二次认证）
 2. 检查这两门课是否有新的录播视频
 3. 如果有：提取音频 → 语音识别 → 提取 PPT 图片 → OCR 转写 → AI 生成课程笔记
 4. 将所有新课次的笔记汇总成**一封邮件**发送给你
@@ -35,7 +35,7 @@
 |---|---|---|---|
 | `STUID` | ✅ | 复旦学号 | `22307110000` |
 | `UISPSW` | ✅ | UIS 统一身份认证密码 | `your_password` |
-| `UIS_TOTP_SECRET` | ✅ | 二次验证要求的动态口令（OTP）（见下） | `XXW33***********` |
+| `UIS_TOTP_SECRET` | 要求 TOTP 二次认证时必填 | 已绑定认证器的 Base32 长期密钥，**不是当前六位验证码**（见下） | 使用绑定时获取的密钥 |
 | `COURSE_IDS` | ✅ | 要监控的课程 ID，多个用英文逗号分隔 | `35472,30251` |
 | `DASHSCOPE_API_KEY` | ⬜ | ModelScope 平台 API Key | `ms-xxxxxxxx` |
 | `DEEPSEEK_API_KEY` | ⬜ | DeepSeek API Key（推荐） | `sk-xxxxxxxx` |
@@ -48,9 +48,19 @@
 
 #### 配置动态口令二次验证（TOTP）
 
-> 2026/11/09 iCourse 平台升级了登录策略，要求所有账号在密码验证后进行二次验证（TOTP），我们采用 TOP 登录的方法进行二次验证
+程序先使用学号和 UIS 密码登录。如果服务端返回二次认证要求，且可选方式中包含动态口令（OTP），程序会在提交前生成验证码并完成认证；不需要二次认证时，不会读取 TOTP 密钥生成验证码。
 
-进入 [UIS 个人中心的账号安全页面](https://id.fudan.edu.cn/uc/#/pc/userCenter/accountSecurity)，在「动态口令」中按提示完成绑定，并保存绑定时获取的 **Base32 密钥**，按上述的 Secrets 填入 `UIS_TOTP_SECRET` 即可
+1. 进入 [UIS 个人中心的账号安全页面](https://id.fudan.edu.cn/uc/#/pc/userCenter/accountSecurity)，在「动态口令」中完成认证器绑定，并妥善保存绑定时获取的 **Base32 长期密钥**。
+2. 在学校网页上使用认证器生成的验证码，确认已绑定且可以完成登录。
+3. 在仓库的 **Settings → Secrets and variables → Actions** 中创建 `UIS_TOTP_SECRET`，填入该长期密钥。不要填当前六位验证码、二维码图片或完整的 `otpauth://` 地址。
+
+> #todo：补充并核实学校页面的绑定操作，包括如何查看 Base32 密钥，以及已绑定用户无法查看原密钥时如何处理。请勿使用包含真实密钥、二维码或账号信息的截图。
+
+当前实现支持 **SHA-1、6 位数字、30 秒周期**的 TOTP。GitHub Actions 在运行时生成验证码，无需连接本机认证器；`iCourse Check` 和 `Single Run` 两个工作流均会读取 `UIS_TOTP_SECRET`。原有的 `STUID` 和 `UISPSW` 仍需配置。
+
+本地运行时，将同名环境变量 `UIS_TOTP_SECRET` 传给 Python 进程，可参考 `.env.example`。配置模块直接读取环境变量，不会自动加载 `.env` 文件。
+
+长期密钥可用于持续生成验证码，应仅保存在受保护的凭据存储中，不要提交到仓库、日志、截图或 PR。程序只输出认证进度，不输出密钥和验证码。TOTP 支持不保证消除 WebVPN 连接超时，也不处理其他类型的二次认证挑战。
 
 ![UIS 动态口令绑定页面，箭头所指密钥用于 UIS_TOTP_SECRET](docs/uis-totp.png)
 
@@ -85,6 +95,10 @@
 - **自动运行**：默认每天 19:36（北京时间）自动执行
 - **手动触发**：进入仓库 → Actions → **iCourse Check** → Run workflow
 - **立即触发**：也可通过前端页面点击「触发订阅检查」按钮
+
+升级代码后，请在工作流页面点击 **Run workflow**，选择更新后的 `main` 分支，新建一次运行。旧运行页面的 **Re-run jobs** 会继续使用该次运行原来的提交，不能用于验证刚推送的修改。
+
+运行详情会显示使用的提交号。进入 TOTP 分支时，日志会显示 `[Login] TOTP second factor...`；认证成功后显示 `[Login] TOTP OK`。可以据此确认是否实际执行了二次认证，无需记录验证码。
 
 首次运行会处理所有已有录播，后续只处理新增课次。
 
